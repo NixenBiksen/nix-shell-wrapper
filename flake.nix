@@ -14,10 +14,14 @@
       system:
       let
         pkgs = import nixpkgs { inherit system; };
+        nix-shell-wrapper = pkgs.callPackage ./derivation.nix { inherit system; };
       in
       {
+        checks = {
+          inherit nix-shell-wrapper;
+        };
         packages = rec {
-          nix-shell-wrapper = pkgs.callPackage ./derivation.nix { inherit system; };
+          inherit nix-shell-wrapper;
           default = nix-shell-wrapper;
         };
       }
