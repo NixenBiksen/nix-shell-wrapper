@@ -120,11 +120,11 @@ fn main() -> Result<()> {
         cmd.args(["shell", "--impure", "--expr"]);
 
         let mut combined_expr;
-        if let Ok(system_flake) = std::env::var("NIX_SHELL_WRAPPER_SYSTEM_FLAKE") {
+        if let Ok(flake) = std::env::var("NIX_SHELL_WRAPPER_FLAKE") {
             combined_expr = format!(
                 r#"
                     let
-                        systemFlake = builtins.getFlake {system_flake:?};
+                        systemFlake = builtins.getFlake {flake:?};
                     in
                         with systemFlake.nix-shell-wrapper-pkgs.{NIX_SHELL_WRAPPER_SYSTEM:?}.default; [
                 "#

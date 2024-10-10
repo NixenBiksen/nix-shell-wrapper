@@ -18,7 +18,7 @@ TODO: Write some text about how this works
 
 ## Environment variables
 
-### `NIX_SHELL_WRAPPER_SYSTEM_FLAKE`
+### `NIX_SHELL_WRAPPER_FLAKE`
 
 This variable can optionally be set to a flake reference. Set this if you want additional control over which packages you access to when using the wrapper. You can for instance write something like this in the `flake.nix` for your system:
 
@@ -32,7 +32,7 @@ And then add something like this to a NixOS module somewhere:
 
 ```nix
 nix.registry.self.flake = flakeInputArguments.self;
-environment.variables."NIX_SHELL_WRAPPER_SYSTEM_FLAKE" = "self";
+environment.variables."NIX_SHELL_WRAPPER_FLAKE" = "self";
 ```
 
 TODO: Document where `flakeInputArguments` come from.
