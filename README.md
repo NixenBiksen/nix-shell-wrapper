@@ -16,7 +16,7 @@ nix-shell-wrapper = {
 
 ### 2. Add a shell alias
 
-It can look something like this in your bash config:
+It could look something like this in your bash config:
 
 ```bash
 function ns() {
@@ -28,7 +28,7 @@ function ns() {
 
 ### 3. (Optional) Add the shell descriptions to your shell prompt
 
-It can look something like this:
+It could look something like this:
 
 ```bash
 CYAN="\[\e[0;36m\]"
