@@ -75,16 +75,17 @@ enum App {
     /// Enters a shell based on a shell.nix
     Shell(ShellCommand),
 
-    /// Enters a shell based on the devshell in a flake.nix
+    /// Enters a shell based on a devshell in a flake.nix
     Flake(FlakeCommand),
 
-    /// Enters a shell based on the derivation file. This is a convenience around using callPackage manually.
+    /// Enters a shell based on a derivation file. This is a convenience over using callPackage manually
     Derivation(DerivationCommand),
 
-    /// Enters a shell with a number of nix packages.
+    /// Enters a shell based on a number of nix expressions
     Exprs(ExprsCommand),
 
     #[command(external_subcommand)]
+    /// A bit of a hack to make the Exprs subcommand work without specifying the exprs keyword
     ExprsExternal(Vec<String>),
 }
 
@@ -97,24 +98,24 @@ struct ShellCommand {
 
 #[derive(Parser, Debug)]
 struct FlakeCommand {
-    /// Path to a directory with a flake.nix which contains a devshell.
+    /// Path to a directory with a flake.nix which contains a devshell
     #[clap(default_value = ".")]
     flake: PathBuf,
 }
 
 #[derive(Parser, Debug)]
 struct DerivationCommand {
-    /// Path to a the derivation.
+    /// Path to a the derivation
     derivation: String,
 
-    /// Arguments to give to the derivation.
+    /// Arguments to give to the derivation
     #[clap(default_value = "{}")]
     args: String,
 }
 
 #[derive(Parser, Debug)]
 struct ExprsCommand {
-    /// A number of nix expressions; each expression must evaluate to a package.
+    /// A number of nix expressions; each expression must evaluate to a package
     exprs: Vec<String>,
 }
 
