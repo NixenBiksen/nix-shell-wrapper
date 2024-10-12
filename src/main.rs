@@ -2,7 +2,7 @@ mod string_truncation;
 
 use clap::{
     builder::{styling::AnsiColor, Styles},
-    command, CommandFactory, Parser,
+    command, Parser,
 };
 use color_eyre::{
     eyre::{self, WrapErr},
@@ -63,93 +63,109 @@ fn clap_v3_styling() -> Styles {
 
 #[derive(Parser, Debug)]
 #[command(styles = clap_v3_styling())]
-struct App {
-    #[clap(short = 'f')]
+#[command(about = r#"nix-shell-wrapper: Easy tool for entering nix-shells
+
+If no arguments are given, the tool will try to evaluate a flake.nix or shell.nix in the current directory.
+
+ The default subcommand is the exprs subcommand. In other words these commands do the same:
+
+* `nix-shell-wrapper hello`
+* `nix-shell-wrapper exprs hello`"#)]
+enum App {
+    /// Enters a shell based on a shell.nix
+    Shell(ShellCommand),
+
+    /// Enters a shell based on the devshell in a flake.nix
+    Flake(FlakeCommand),
+
+    /// Enters a shell based on the derivation file. This is a convenience around using callPackage manually.
+    Derivation(DerivationCommand),
+
+    /// Enters a shell with a number of nix packages.
+    Exprs(ExprsCommand),
+
+    #[command(external_subcommand)]
+    ExprsExternal(Vec<String>),
+}
+
+#[derive(Parser, Debug)]
+struct ShellCommand {
     /// Path to a `shell.nix`
-    shell: Option<PathBuf>,
+    #[clap(default_value = "./shell.nix")]
+    shell: PathBuf,
+}
 
-    #[clap(long = "flake")]
-    /// Path to a `flake.nix` which contains a devshell
-    flake: Option<PathBuf>,
+#[derive(Parser, Debug)]
+struct FlakeCommand {
+    /// Path to a directory with a flake.nix which contains a devshell.
+    #[clap(default_value = ".")]
+    flake: PathBuf,
+}
 
-    /// A list of expression to be evaluated
+#[derive(Parser, Debug)]
+struct DerivationCommand {
+    /// Path to a the derivation.
+    derivation: String,
+
+    /// Arguments to give to the derivation.
+    #[clap(default_value = "{}")]
+    args: String,
+}
+
+#[derive(Parser, Debug)]
+struct ExprsCommand {
+    /// A number of nix expressions; each expression must evaluate to a package.
     exprs: Vec<String>,
 }
 
 fn main() -> Result<()> {
-    let mut env = Vec::new();
     color_eyre::install()?;
 
-    let mut args = App::parse();
+    let args = App::parse();
 
-    if args.shell.is_some() && !args.exprs.is_empty() {
-        use std::io::Write;
-        let stderr = std::io::stderr();
-        let mut stderr = stderr.lock();
-        writeln!(stderr, "Cannot use both paths and exprs").ok();
-        writeln!(stderr).ok();
-        App::command().print_help().ok();
-        writeln!(stderr).ok();
-        return Ok(());
-    }
-
-    if args.shell.is_none() && args.exprs.is_empty() && args.flake.is_none() {
-        let shell_path = PathBuf::from("shell.nix");
-        let flake_path = PathBuf::from("flake.nix");
-        if shell_path.exists() {
-            args.shell = Some(shell_path);
-        } else if flake_path.exists() {
-            args.flake = Some(".".into());
-        } else {
-            eyre::bail!("Cannot find a nix shell to run");
-        }
-    }
-
+    let mut env = Vec::new();
     let mut cmd;
-    if let Some(shell) = args.shell {
-        cmd = std::process::Command::new("nix-shell");
-        env.push(make_pretty(&shell)?);
-        cmd.arg(shell);
-    } else if let Some(flake) = args.flake {
-        cmd = std::process::Command::new("nix");
-        env.push(make_pretty(&flake)?);
-        cmd.arg("develop");
-        cmd.arg(flake);
-    } else {
-        cmd = std::process::Command::new("nix");
-        cmd.args(["shell", "--impure", "--expr"]);
-
-        let mut combined_expr;
-        if let Ok(flake) = std::env::var("NIX_SHELL_WRAPPER_FLAKE") {
-            combined_expr = format!(
-                r#"
-                    let
-                        systemFlake = builtins.getFlake {flake:?};
-                    in
-                        with systemFlake.nix-shell-wrapper-pkgs.{NIX_SHELL_WRAPPER_SYSTEM:?}.default; [
-                "#
-            );
-        } else {
-            combined_expr = format!(
-                r#"
-                    let
-                        nixpkgs = builtins.getFlake "nixpkgs";
-                        pkgs = import nixpkgs {{ system = {NIX_SHELL_WRAPPER_SYSTEM:?}; }};
-                    in
-                        with pkgs; [
-                "#
-            );
+    match args {
+        App::Shell(ShellCommand { shell }) => {
+            cmd = std::process::Command::new("nix-shell");
+            env.push(make_pretty(&shell)?);
+            cmd.arg(shell);
         }
-
-        for expr in args.exprs {
-            combined_expr.push('(');
-            combined_expr.push_str(&expr);
-            combined_expr.push_str(") ");
-            env.push(truncate_string(&expr));
+        App::Flake(FlakeCommand { flake }) => {
+            cmd = std::process::Command::new("nix");
+            env.push(make_pretty(&flake)?);
+            cmd.arg("develop");
+            cmd.arg(flake);
         }
+        App::Derivation(DerivationCommand { derivation, args }) => {
+            cmd = std::process::Command::new("nix");
+            cmd.args(["shell", "--impure", "--expr"]);
 
-        combined_expr.push(']');
-        cmd.arg(combined_expr);
+            let mut combined_expr = expr_prefix();
+            combined_expr.push_str("(callPackage ");
+            combined_expr.push_str(&derivation);
+            combined_expr.push(' ');
+            combined_expr.push_str(&args);
+            combined_expr.push_str(")]");
+            cmd.arg(combined_expr);
+            env.push(truncate_string(&derivation));
+        }
+        App::Exprs(ExprsCommand { exprs }) | App::ExprsExternal(exprs) => {
+            cmd = std::process::Command::new("nix");
+            cmd.args(["shell", "--impure", "--expr"]);
+
+            let mut combined_expr = expr_prefix();
+
+            for expr in exprs {
+                combined_expr.push('(');
+                combined_expr.push_str(&expr);
+                combined_expr.push_str(") ");
+                env.push(truncate_string(&expr));
+            }
+
+            combined_expr.push(']');
+            cmd.arg(combined_expr);
+        }
     }
     let env = format!("{}", env.join("+"));
     cmd.env(
@@ -160,5 +176,31 @@ fn main() -> Result<()> {
         },
     );
     cmd.exec();
+
     Ok(())
+}
+
+fn expr_prefix() -> String {
+    let combined_expr;
+    if let Ok(flake) = std::env::var("NIX_SHELL_WRAPPER_FLAKE") {
+        combined_expr = format!(
+            r#"
+                    let
+                        systemFlake = builtins.getFlake {flake:?};
+                    in
+                        with systemFlake.nix-shell-wrapper-pkgs.{NIX_SHELL_WRAPPER_SYSTEM:?}.default; [
+                "#
+        );
+    } else {
+        combined_expr = format!(
+            r#"
+                    let
+                        nixpkgs = builtins.getFlake "nixpkgs";
+                        pkgs = import nixpkgs {{ system = {NIX_SHELL_WRAPPER_SYSTEM:?}; }};
+                    in
+                        with pkgs; [
+                "#
+        );
+    }
+    combined_expr
 }
