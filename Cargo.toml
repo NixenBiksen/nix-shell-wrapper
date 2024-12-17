@@ -6,5 +6,5 @@ edition = "2021"
 [dependencies]
 color-eyre = "0.6.3"
 dirs = "5.0.1"
-clap = { version = "4.5.20", features = ["derive", "color"] }
+clap = { version = "4.5.23", features = ["derive", "color"] }
 unicode-segmentation = "1.12.0"
