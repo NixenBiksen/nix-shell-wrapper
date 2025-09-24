@@ -182,9 +182,8 @@ fn main() -> Result<()> {
             Err(_) => env,
         },
     );
-    cmd.exec();
 
-    Ok(())
+    Err(cmd.exec().into())
 }
 
 fn make_exprs_command(
