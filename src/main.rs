@@ -14,7 +14,7 @@ use std::{
 };
 use string_truncation::truncate_string;
 
-const NIX_SHELL_WRAPPER_SYSTEM: &'static str = env!("NIX_SHELL_WRAPPER_SYSTEM");
+const NIX_SHELL_WRAPPER_SYSTEM: &str = env!("NIX_SHELL_WRAPPER_SYSTEM");
 
 fn make_pretty(path: &Path) -> Result<String> {
     let path = std::fs::canonicalize(path)
@@ -174,7 +174,7 @@ fn main() -> Result<()> {
             cmd = make_exprs_command(exprs, Vec::new(), &mut env);
         }
     }
-    let env = format!("{}", env.join("+"));
+    let env = env.join("+");
     cmd.env(
         "NIX_SHELL_WRAPPER_DESCRIPTIONS",
         match std::env::var("NIX_SHELL_WRAPPER_DESCRIPTIONS") {
@@ -218,11 +218,11 @@ fn expr_prefix(extra_flakes: Vec<(String, PathBuf)>) -> String {
             "systemFlake.nix-shell-wrapper-pkgs.{NIX_SHELL_WRAPPER_SYSTEM:?}.default"
         ));
     } else {
-        let_exprs.push(format!(r#"  nixpkgs = builtins.getFlake "nixpkgs";"#));
+        let_exprs.push(r#"  nixpkgs = builtins.getFlake "nixpkgs";"#.to_string());
         let_exprs.push(format!(
             "  pkgs = import nixpkgs {{ system = {NIX_SHELL_WRAPPER_SYSTEM:?}; }};"
         ));
-        with_exprs.push(format!("pkgs"));
+        with_exprs.push("pkgs".to_string());
     }
 
     for (name, path) in extra_flakes {

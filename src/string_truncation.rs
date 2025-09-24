@@ -28,7 +28,7 @@ pub fn truncate_string(s: &str) -> String {
 
     for (i, w) in s.unicode_word_indices().rev() {
         let mut s = trim_and_replace_whitespace(&format!("{}{}", &s[..i], w));
-        s.push_str("…");
+        s.push('…');
         if (MIN_EXPR_LEN..=MAX_EXPR_LEN).contains(&grapheme_count(&s)) {
             return s;
         }
@@ -36,7 +36,7 @@ pub fn truncate_string(s: &str) -> String {
 
     for (i, g) in s.grapheme_indices(true).rev() {
         let mut s = trim_and_replace_whitespace(&format!("{}{}", &s[..i], g));
-        s.push_str("…");
+        s.push('…');
         if (MIN_EXPR_LEN..=MAX_EXPR_LEN).contains(&grapheme_count(&s)) {
             return s;
         }
